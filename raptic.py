@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from dialog import Dialog
-from subprocess import check_output, call, CalledProcessError, Popen
+from subprocess import check_output, call, CalledProcessError, Popen, DEVNULL
 from configparser import ConfigParser
 from os.path import abspath, expanduser, expandvars, isfile
 from time import sleep
@@ -110,8 +110,7 @@ class RAPTIC:
             fullscreen = '-f' if self.config.getboolean('general', 'fullscreen') else '',
             tty = ':{}'.format(tty) if tty else ''
          )
-      call(command, shell=True)
-
+      call(command, shell=True, stderr=DEVNULL, stdout=DEVNULL)
 
    def __desktop_environment_start(self):
       ''' Run desktop environment by calling `startx`. '''
