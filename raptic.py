@@ -179,3 +179,10 @@ class RAPTIC:
       ''' Clear the screen and exit the application with given status code. '''
       Popen('clear', shell=False, stdout=None, stderr=None, close_fds=True)
       exit(code)
+
+
+if __name__ == '__main__':
+   import locale
+   locale.setlocale(locale.LC_ALL, '')
+   raptic = RAPTIC()
+   raptic.run()
