@@ -95,7 +95,6 @@ class RAPTIC:
 
    def __rdesktop_start(self):
       ''' Run `rdesktop` via `xinit`. '''
-      tty = 1
       try:
          rdesktop_path = check_output(['which', 'rdesktop']).decode('utf8').strip()
       except CalledProcessError:
@@ -103,12 +102,11 @@ class RAPTIC:
             'of wrong settings or rdesktop is currently not installed.'))
          self.exit(1)
 
-      command = 'xinit {rdesktop} -u {user} {server} {fullscreen} -- {tty}'.format(
+      command = 'xinit {rdesktop} -u {user} {server} {fullscreen}'.format(
             rdesktop=rdesktop_path,
             user = self.config.get('general', 'user'),
             server = self.config.get('general', 'server'),
-            fullscreen = '-f' if self.config.getboolean('general', 'fullscreen') else '',
-            tty = ':{}'.format(tty) if tty else ''
+            fullscreen = '-f' if self.config.getboolean('general', 'fullscreen') else ''
          )
       call(command, shell=True, stderr=DEVNULL, stdout=DEVNULL)
 
