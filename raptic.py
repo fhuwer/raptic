@@ -6,12 +6,25 @@ from os.path import abspath, expanduser, expandvars, isfile
 from time import sleep
 
 
+class ConfigOption:
+   def __init__(self, name, label, description, option_type, default, required=True):
+      self.name = name
+      self.label = label
+      self.description = description
+      self.option_type = option_type
+      self.default = default
+      self.required = required
+
+
 class RAPTIC:
-   configuration_options = [
-            ('Server', 'Hostname or IP-Address of the ThinClient-Host-Server', str, '', True),
-            ('User', 'Username of the user that should be used by this ThinClient', str, '', True),
-            ('Fullscreen', 'Run rdesktop in fullscreen mode (default: yes)', bool, 'yes', False),
-         ]
+   configuration_options = {
+         'Server': ConfigOption('server', 'Server',
+            'Hostname or IP-Address of the ThinClient-Host-Server', str, '', True),
+         'Username': ConfigOption('user', 'Username',
+            'Username of the user that should be used by this ThinClient', str, '', True),
+         'Fullscreen': ConfigOption('fullscreen', 'Fullscreen',
+            'Run rdesktop in fullscreen mode (default: yes)', bool, 'yes', False),
+      }
 
    def __init__(self):
       ''' Initialize RAPTIC. '''
@@ -29,13 +42,16 @@ class RAPTIC:
          - ~/.raptic
          - ~/.config/raptic
       '''
+      self.__config_path = ''
       self.config = ConfigParser()
       for filename in ['~/.raptic', '~/.config/raptic']:
          filename = abspath(expanduser(expandvars(filename)))
          if isfile(filename):
             self.config.read(filename)
             self.__config_path = filename
-            return
+            break
+      if not self.__config_path:
+         self.__config_path = abspath(expanduser(expandvars('~/.raptic')))
 
    def __first_start(self):
       ''' Show dialogs to configure RAPTIC on the first execution. '''
@@ -43,49 +59,63 @@ class RAPTIC:
          'this PC. We therefore will generate a new configuration in the following steps.'))
 
       self.config['general'] = {}
-      for name, description, option_type, default, required in RAPTIC.configuration_options:
-         if required:
-            code, value = self.dialog.inputbox(name)
+      for label, option in RAPTIC.configuration_options.items():
+         if option.required:
+            code, value = self.dialog.inputbox(option.label)
             if code != self.dialog.OK:
                self.dialog.msgbox('Configuration aborted. No configuration file written...')
-               self.exit(1)
          else:
-            value = default
-         self.config['general'][name] = value
+            value = option.default
+         self.config['general'][option.name] = value
       try:
          self.__config_save()
          self.dialog.msgbox('Configuration file has been written. You can now start using RAPTIC.')
       except FileNotFoundError:
-         self.dialog.msgbox('Configuration file "{}" is not writeable.'.format(self.__config_path))
+         self.dialog.msgbox('Configuration file ({}) is not writeable.'.format(self.__config_path))
          self.exit(1)
 
    def __config_edit(self):
       ''' Show menu for editing the configuration. '''
-      changed_config = ConfigParser()
-      changed_config.update(self.config)
+      config_changed = False
+      config_tmp = ConfigParser()
+      config_tmp.update(self.config)
       while True:
          code, tag = self.dialog.menu('What setting do you want to change?',
-               choices=[(name, changed_config['general'][name]) for name, *_ in
-                  RAPTIC.configuration_options], ok_label='CHANGE', cancel_label='BACK',
+               choices=[(option.label, config_tmp['general'][option.name]) for option in
+                  RAPTIC.configuration_options.values()], ok_label='CHANGE', cancel_label='BACK',
                extra_button=True, extra_label='SAVE')
 
          if code == self.dialog.CANCEL:
-            return
+            if config_changed:
+               code_exit = self.dialog.yesno('Do you really want to go back without saving the configuration?')
+               if code_exit == self.dialog.OK:
+                  return
+            else:
+               return
 
          if code == self.dialog.OK:
-            code_change, value = self.dialog.inputbox(tag, init=changed_config['general'][tag])
+            option = RAPTIC.configuration_options[tag]
+            if option.option_type == bool:
+               current_value = config_tmp.getboolean('general', option.name)
+               code_change, value = self.dialog.radiolist(option.label, choices=[
+                  ('yes', '', current_value),
+                  ('no', '', not current_value)],
+                  default_item='yes' if current_value else 'no')
+            else:
+               code_change, value = self.dialog.inputbox(option.label,
+                     init=config_tmp['general'][option.name])
             if code_change == self.dialog.OK:
-               changed_config['general'][tag] = value
+               config_changed = True
+               config_tmp['general'][option.name] = value
 
          if code == self.dialog.EXTRA:
-            self.config.update(changed_config)
+            self.config.update(config_tmp)
             try:
                self.__config_save()
-               self.dialog.infobox('The config has been written to file.', title='RAPTIC')
-               sleep(1)
+               self.dialog.msgbox('The config has been written to file.', title='RAPTIC')
             except FileNotFoundError:
-               self.dialog.msgbox('Configuration file "{}" is not writeable.'.format(
-                  self.__config_path))
+               self.dialog.msgbox('Configuration file ({}) is not writeable.'.format(
+                  self.__config_path), title='ERROR')
             return
 
    def __config_save(self):
